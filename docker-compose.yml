@@ -1,0 +1,27 @@
+version: '2'
+services:
+  sdk:
+     build:
+       context: .
+       dockerfile: Dockerfile
+     volumes:
+        - ./:/var/lib/sdk/
+ #      - ./build:/var/lib/sdk/build
+ #      - ./config:/var/lib/sdk/config:rw
+ #      - ./coverage/coveralls:/var/lib/sdk/coverage/coveralls:rw
+ #      - ./examples:/var/lib/sdk/examples:rw
+ #      - ./package.json:/var/lib/sdk/package.json
+ #      - ./src:/var/lib/sdk/src:rw
+ #      - ./tasks:/var/lib/sdk/tasks:rw
+ #      - ./.git:/var/lib/sdk/.git
+     ports:
+        - "3000:3000"
+     expose:
+        - "9229"
+#        - "50000-60000"
+      #if wishing to use the dev server uncomment this or run it via the command line
+      # command: node --debug-brk --inspect=${SITE_NAME}:9229 ./node_modules/.bin/jest --runInBand
+
+
+
+
