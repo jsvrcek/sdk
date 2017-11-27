@@ -16,9 +16,9 @@
  */
 
 import createFilter from '@mapbox/mapbox-gl-style-spec/feature_filter';
-import { reprojectGeoJson } from '../util';
-import { MAP } from '../action-types';
-import { DEFAULT_ZOOM, LAYER_VERSION_KEY, SOURCE_VERSION_KEY, TITLE_KEY, DATA_VERSION_KEY, GROUP_KEY } from '../constants';
+import {getGroup, getLayerIndexById, reprojectGeoJson} from '../util';
+import {MAP} from '../action-types';
+import {DEFAULT_ZOOM, LAYER_VERSION_KEY, SOURCE_VERSION_KEY, TITLE_KEY, DATA_VERSION_KEY, GROUP_KEY} from '../constants';
 
 function defaultMetadata() {
   // define the metadata.
@@ -89,33 +89,165 @@ export function dataVersionKey(sourceName) {
  *  @returns {Object} The new state object.
  */
 function placeLayer(state, layer, targetId) {
-  let placed = false;
-  const new_layers = [];
+  const new_layers = state.layers.slice();
+  const idx1 = getLayerIndexById(new_layers, layer.id);
+  const idx2 = getLayerIndexById(new_layers, targetId);
+  if (idx1 !== -1) {
+    new_layers.splice(idx1, 1);
+  }
+  const newIndex = targetId ? idx2 : new_layers.length;
+  new_layers.splice(newIndex, 0, layer);
+  return Object.assign({}, state, {
+    layers: new_layers,
+  }, incrementVersion(state.metadata, LAYER_VERSION_KEY));
+}
 
-  // do some sanity checks to prevent extra work
-  //  when the targetId is not valid.
-  for (let i = 0, ii = state.layers.length; i < ii; i++) {
-    const l = state.layers[i];
-
-    // if this is the target id then
-    //  place the layer before adding the target
-    //  back into the layer stack
-    if (l.id === targetId) {
-      new_layers.push(layer);
-      placed = true;
+/** Change the target for reodering of layers. This makes sure that groups
+ *  stay together in the layer stack. Layers of a group cannot move outside of
+ *  the group.
+ *  @param {Object} state Current state.
+ *  @param {Object} action Action to handle.
+ *
+ *  @returns {string|boolean} The new targetId or false if moving should be blocked.
+ */
+function changeTarget(state, action) {
+  const layerIdx = getLayerIndexById(state.layers, action.layerId);
+  const layer = state.layers[layerIdx];
+  const layerGroup = getGroup(layer);
+  const targetIdx = getLayerIndexById(state.layers, action.targetId);
+  if (layerGroup) {
+    return false;
+  }
+  let i, ii;
+  if (layerIdx < targetIdx) {
+    // move up
+    for (i = targetIdx + 1, ii = state.layers.length; i < ii; i++) {
+      if (getGroup(state.layers[i]) === layerGroup) {
+        return state.layers[i - 1].id;
+      }
     }
+    return state.layers[ii - 1].id;
+  } else {
+    // move down
+    for (i = targetIdx - 1; i >= 0; i--) {
+      if (getGroup(state.layers[i]) === layerGroup) {
+        return state.layers[i + 1].id;
+      }
+    }
+    return state.layers[0].id;
+  }
+}
 
-    // if the layer exists in the list,
-    //  do not add it back inline.
-    if (l.id !== layer.id) {
-      new_layers.push(l);
+/** Change the order of the layer in the stack.
+ *  @param {Object} state Current state.
+ *  @param {Object} action Action to handle.
+ *
+ *  @returns {Object} The new state.
+ */
+function orderLayer(state, action) {
+  let layer = null, target = null;
+  for (let i = 0, ii = state.layers.length; i < ii; i++) {
+    if (state.layers[i].id === action.layerId) {
+      layer = state.layers[i];
+    }
+    if (state.layers[i].id === action.targetId) {
+      target = state.layers[i];
     }
   }
 
-  // whenever the targetId is not found,
-  //  add the layer to the end of the list.
-  if (!placed) {
-    new_layers.push(layer);
+  if (layer !== null) {
+    let targetId = action.targetId;
+    let targetGroup = getGroup(target);
+    let layerGroup = getGroup(layer);
+    if (layerGroup !== targetGroup) {
+      targetId = changeTarget(state, action);
+    }
+    if (targetId !== false) {
+      return placeLayer(state, layer, targetId);
+    }
+  }
+  return state;
+}
+
+/** Move a group relative to another group.
+ *
+ *  @param {Object} state Current state.
+ *  @param {Object} action Action to handle.
+ *
+ *  @returns {Object} The new state.
+ */
+function moveGroup(state, action) {
+  const place_at = getLayerIndexById(state.layers, action.placeAt);
+  const n_layers = state.layers.length;
+
+  // sanity check the new index.
+  if (place_at < 0 || place_at > n_layers) {
+    return state;
+  }
+
+  // find the starting and ending points of the group
+  let group_start = null;
+  let group_end = null;
+  for (let i = 0, ii = n_layers; i < ii; i++) {
+    const group = getGroup(state.layers[i]);
+    if (group === action.group) {
+      if (group_start === null || i < group_start) {
+        group_start = i;
+      }
+      if (group_end === null || i > group_end) {
+        group_end = i;
+      }
+    }
+  }
+
+
+  // get the real index of the next spot for the group,
+  // if the placeAt index is mid group then place_at should
+  // be the index of the FIRST member of that group.
+  let place_start = place_at;
+  const place_group = getGroup(state.layers[place_at]);
+  const place_ahead = (place_at > group_start);
+
+  // when placing a group before or after another group
+  // the bounds of the target group needs to be found and the
+  // appropriate index chosen based on the direction of placement.
+  if (place_group) {
+    let new_place = -1;
+    if (place_ahead) {
+      for (let i = n_layers - 1; i >= 0 && new_place < 0; i--) {
+        if (getGroup(state.layers[i]) === place_group) {
+          new_place = i;
+        }
+      }
+    } else {
+      for (let i = 0, ii = n_layers; i < ii && new_place < 0; i++) {
+        if (getGroup(state.layers[i]) === place_group) {
+          new_place = i;
+        }
+      }
+    }
+    place_start = new_place;
+  }
+
+  // build a new array for the layers.
+  let new_layers = [];
+
+  // have the group layers ready to concat.
+  const group_layers = state.layers.slice(group_start, group_end + 1);
+
+  for (let i = 0, ii = n_layers; i < ii; i++) {
+    const layer = state.layers[i];
+    const in_group = (getGroup(layer) === action.group);
+
+    if (place_ahead && !in_group) {
+      new_layers.push(layer);
+    }
+    if (i === place_start) {
+      new_layers = new_layers.concat(group_layers);
+    }
+    if (!place_ahead && !in_group) {
+      new_layers.push(layer);
+    }
   }
 
   return Object.assign({}, state, {
@@ -123,29 +255,16 @@ function placeLayer(state, layer, targetId) {
   }, incrementVersion(state.metadata, LAYER_VERSION_KEY));
 }
 
-/** Change the order of the layer in the stack.
- */
-function orderLayer(state, action) {
-  let layer = null;
-  for (let i = 0, ii = state.layers.length; i < ii && layer === null; i++) {
-    if (state.layers[i].id === action.layerId) {
-      layer = state.layers[i];
-    }
-  }
-
-  if (layer !== null) {
-    return placeLayer(state, layer, action.targetId);
-  }
-  return state;
-}
-
 /** Add a layer to the state.
+ *  @param {Object} state Current state.
+ *  @param {Object} action Action to handle.
+ *
+ *  @returns {Object} The new state.
  */
 function addLayer(state, action) {
   // TODO: Maybe decide on what a "default case" is in
   //       order to support easier dev.
   const new_layer = Object.assign({
-    filter: null,
     paint: {},
     metadata: {},
   }, action.layerDef);
@@ -159,6 +278,10 @@ function addLayer(state, action) {
 }
 
 /** Remove a layer from the state.
+ *  @param {Object} state Current state.
+ *  @param {Object} action Action to handle.
+ *
+ *  @returns {Object} The new state.
  */
 function removeLayer(state, action) {
   const new_layers = [];
@@ -174,6 +297,10 @@ function removeLayer(state, action) {
 }
 
 /** Update a layer that's in the state already.
+ *  @param {Object} state Current state.
+ *  @param {Object} action Action to handle.
+ *
+ *  @returns {Object} The new state.
  */
 function updateLayer(state, action) {
   // action.layer should be a new mix in for the layer.
@@ -202,6 +329,10 @@ function updateLayer(state, action) {
 }
 
 /** Add a source to the state.
+ *  @param {Object} state Current state.
+ *  @param {Object} action Action to handle.
+ *
+ *  @returns {Object} The new state.
  */
 function addSource(state, action) {
   const new_source = {};
@@ -229,6 +360,10 @@ function addSource(state, action) {
 }
 
 /** Remove a source from the state.
+ *  @param {Object} state Current state.
+ *  @param {Object} action Action to handle.
+ *
+ *  @returns {Object} The new state.
  */
 function removeSource(state, action) {
   const new_sources = Object.assign({}, state.sources);
@@ -263,6 +398,10 @@ function changeData(state, sourceName, data) {
 }
 
 /** Add features to a source.
+ *  @param {Object} state Current state.
+ *  @param {Object} action Action to handle.
+ *
+ *  @returns {Object} The new state.
  */
 function addFeatures(state, action) {
   const source = state.sources[action.sourceName];
@@ -293,10 +432,21 @@ function addFeatures(state, action) {
       features: [data].concat(features),
     };
   } else if (data.type === 'FeatureCollection') {
-    new_data = Object.assign({},
-      data,
-      { features: data.features.concat(features) },
-    );
+    let featureCollection = [];
+
+    if (action.position > -1) {
+      for (let i = 0, ii = data.features.length; i < ii; i++) {
+        if (i === action.position) {
+          for (let x = 0, xx = features.length; x < xx; x++) {
+            featureCollection.push(features[x]);
+          }
+        }
+        featureCollection.push(data.features[i]);
+      }
+    } else {
+      featureCollection = data.features.concat(features);
+    }
+    new_data = Object.assign({}, data, {features: featureCollection});
   }
 
   if (new_data !== null) {
@@ -304,7 +454,12 @@ function addFeatures(state, action) {
   }
   return state;
 }
+
 /** Cluster points.
+ *  @param {Object} state Current state.
+ *  @param {Object} action Action to handle.
+ *
+ *  @returns {Object} The new state.
  */
 function clusterPoints(state, action) {
   const source = state.sources[action.sourceName];
@@ -331,9 +486,12 @@ function clusterPoints(state, action) {
 }
 
 /** Remove features from a source.
- *
  *  The action should define a filter, any feature
  *  matching the filter will be removed.
+ *  @param {Object} state Current state.
+ *  @param {Object} action Action to handle.
+ *
+ *  @returns {Object} The new state.
  */
 function removeFeatures(state, action) {
   // short hand the source source and the data
@@ -363,7 +521,7 @@ function removeFeatures(state, action) {
 
     const new_data = Object.assign({},
       data,
-      { features: new_features },
+      {features: new_features},
     );
 
     return changeData(state, action.sourceName, new_data);
@@ -373,6 +531,10 @@ function removeFeatures(state, action) {
 }
 
 /** Set a layer visible in a mutually exclusive group.
+ *  @param {Object} state Current state.
+ *  @param {Object} action Action to handle.
+ *
+ *  @returns {Object} The new state.
  */
 function setLayerInGroupVisible(state, action) {
   const updated_layers = [];
@@ -383,7 +545,7 @@ function setLayerInGroupVisible(state, action) {
         ...layer,
         layout: {
           ...layer.layout,
-          visibility: layer.id === action.layerId ? 'visible': 'none',
+          visibility: layer.id === action.layerId ? 'visible' : 'none',
         },
       });
     } else {
@@ -396,6 +558,10 @@ function setLayerInGroupVisible(state, action) {
 }
 
 /** Change the visibility of a layer given in the action.
+ *  @param {Object} state Current state.
+ *  @param {Object} action Action to handle.
+ *
+ *  @returns {Object} The new state.
  */
 function setVisibility(state, action) {
   let updated = false;
@@ -426,6 +592,10 @@ function setVisibility(state, action) {
 }
 
 /** Load a new context
+ *  @param {Object} state Current state.
+ *  @param {Object} action Action to handle.
+ *
+ *  @returns {Object} The new state.
  */
 function setContext(state, action) {
   // simply replace the full state
@@ -445,10 +615,12 @@ function updateMetadata(state, action) {
 }
 
 /** Update a source's definition.
- *
  *  This is a heavy-handed operation that will
  *  just mixin whatever is in the new object.
+ *  @param {Object} state Current state.
+ *  @param {Object} action Action to handle.
  *
+ *  @returns {Object} The new state.
  */
 function updateSource(state, action) {
   const old_source = state.sources[action.sourceName];
@@ -456,15 +628,21 @@ function updateSource(state, action) {
   new_source[action.sourceName] = Object.assign({}, old_source, action.sourceDef);
   const new_sources = Object.assign({}, state.sources, new_source);
 
+  let metadata;
+  if (new_source[action.sourceName].type === 'geojson') {
+    metadata = incrementVersion(state.metadata, dataVersionKey(action.sourceName));
+  } else {
+    metadata = incrementVersion(state.metadata, SOURCE_VERSION_KEY);
+  }
   return Object.assign({}, state, {
     sources: Object.assign({}, state.sources, new_sources),
-  }, incrementVersion(state.metadata, dataVersionKey(action.sourceName)));
+  }, metadata);
 }
 
 function setZoom(state, action) {
   let zoom = Math.min(DEFAULT_ZOOM.MAX, action.zoom);
   zoom = Math.max(DEFAULT_ZOOM.MIN, zoom);
-  return Object.assign({}, state, { zoom } );
+  return Object.assign({}, state, {zoom});
 }
 
 /** Main reducer.
@@ -486,11 +664,11 @@ export default function MapReducer(state = defaultState, action) {
     case MAP.SET_ZOOM:
       return setZoom(state, action);
     case MAP.SET_NAME:
-      return Object.assign({}, state, { name: action.name });
+      return Object.assign({}, state, {name: action.name});
     case MAP.SET_SPRITE:
-      return Object.assign({}, state, { sprite: action.sprite });
+      return Object.assign({}, state, {sprite: action.sprite});
     case MAP.SET_ROTATION:
-      return Object.assign({}, state, { bearing: action.degrees });
+      return Object.assign({}, state, {bearing: action.degrees});
     case MAP.ADD_LAYER:
       return addLayer(state, action);
     case MAP.REMOVE_LAYER:
@@ -521,6 +699,8 @@ export default function MapReducer(state = defaultState, action) {
       return updateMetadata(state, action);
     case MAP.UPDATE_SOURCE:
       return updateSource(state, action);
+    case MAP.MOVE_GROUP:
+      return moveGroup(state, action);
     default:
       return state;
   }

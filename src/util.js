@@ -11,7 +11,7 @@
  * under the License.
  */
 
-import {TITLE_KEY} from './constants';
+import {GROUP_KEY, TITLE_KEY} from './constants';
 import GeoJsonFormat from 'ol/format/geojson';
 /** @module util
  * @desc functions for Boundless SDK.
@@ -46,6 +46,20 @@ export function getLayerById(layers, id) {
     }
   }
   return null;
+}
+
+/** Get the group from the layer or null if it doesn't exist.
+ *
+ * @param {Object} layer The layer.
+ *
+ * @returns {string|null} The group.
+ */
+export function getGroup(layer) {
+  let layerGroup = null;
+  if (layer && layer.metadata && layer.metadata[GROUP_KEY]) {
+    layerGroup = layer.metadata[GROUP_KEY];
+  }
+  return layerGroup;
 }
 
 /** Parses an arbitrary string as if it were a URL.
@@ -157,7 +171,7 @@ export function jsonClone(object) {
  *  @returns {(number|undefined)} Value.
  */
 export function getKey(dictionary, key) {
-  if(dictionary === undefined || dictionary === null) {
+  if (dictionary === undefined || dictionary === null) {
     return dictionary;
   }
   return dictionary[key];
@@ -165,9 +179,9 @@ export function getKey(dictionary, key) {
 
 /** Check the visibility of a layer.
  *
- *  @param layer The layer to check.
+ *  @param {Object} layer The layer to check.
  *
- * @returns Boolean, true when visible, false when not.
+ *  @returns {boolean} true when visible, false when not.
  */
 export function isLayerVisible(layer) {
   if (layer !== undefined && layer.layout !== undefined) {
@@ -178,10 +192,10 @@ export function isLayerVisible(layer) {
 
 /** Get the z-index of a layer.
  *
- *  @param layers The list of layers.
- *  @param id     The id of the layer to find.
+ *  @param {Array} layers The list of layers.
+ *  @param {string} id The id of the layer to find.
  *
- * @returns integer index of the layer, or -1 if not found.
+ * @returns {number} Index of the layer, or -1 if not found.
  */
 export function getLayerIndexById(layers, id) {
   for (let i = layers.length - 1, ii = 0; i >= ii; i--) {
@@ -203,4 +217,21 @@ export function getLayerTitle(layer) {
     return layer.metadata[TITLE_KEY];
   }
   return layer.id;
+}
+
+/** Get a list of layers based on the group
+ *
+ *  @param {Array} layers The list of layers.
+ *  @param {string} groupId the group ID
+ *
+ * @return {Array} of matching layers.
+ */
+export function getLayersByGroup(layers, groupId) {
+  const group_layers = [];
+  for (let i = 0, ii = layers.length; i < ii; i++) {
+    if (getGroup(layers[i]) === groupId) {
+      group_layers.push(layers[i]);
+    }
+  }
+  return group_layers;
 }

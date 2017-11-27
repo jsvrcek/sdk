@@ -13,18 +13,19 @@
 
 import fetch from 'isomorphic-fetch';
 
-import { Component } from 'react';
-import { connect } from 'react-redux';
+import PropTypes from 'prop-types';
+import {Component} from 'react';
+import {connect} from 'react-redux';
 
 import WfsFormat from 'ol/format/wfs';
 import GeoJsonFormat from 'ol/format/geojson';
 import Projection from 'ol/proj/projection';
 import Proj from 'ol/proj';
 
-import { finishedAction } from '../actions/wfs';
+import {finishedAction} from '../actions/wfs';
 
-import { jsonClone } from '../util';
-import { WFS } from '../action-types';
+import {jsonClone} from '../util';
+import {WFS} from '../action-types';
 
 /** @module components/wfs
  * @desc Provides a component which will respond to WFS updates.
@@ -100,25 +101,37 @@ class WfsController extends Component {
       }).then((response) => {
         if (response.ok) {
           return response.text();
+        } else {
+          throw Error(response.statusText);
         }
-      }).catch((error) => {
-        // let the caller know the request has errored.
-        this.props.onRequestError(error, action, id);
-      }).then((text) => {
+      }).then(text => (new window.DOMParser()).parseFromString(text, 'text/xml'))
+        .then(data  => {
         // A 200 does not necessarily mean the
-        //  request was successful.  This attempst to
+        //  request was successful.  This attempts to
         //  parse the transaction response and then passes
         //  it to onFinishTransaction. Handling is left to the
         //  user.
-        const wfs_response = this.wfs_format.readTransactionResponse(text);
+          if (data.documentElement.localName === 'ExceptionReport') {
+            const exceptionNode = data.getElementsByTagNameNS('http://www.opengis.net/ows', 'ExceptionText');
+            throw Error(exceptionNode.item(0).textContent);
+          } else {
+            const wfs_response = this.wfs_format.readTransactionResponse(data);
 
+            // ensure the action is removed from the state
+            this.props.dispatch(finishedAction(id));
+            // remove it from the pending actions
+            delete this.pendingActions[id];
+
+            this.props.onFinishTransaction(wfs_response, action);
+          }
+        }).catch((error) => {
         // ensure the action is removed from the state
-        this.props.dispatch(finishedAction(id));
-        // remove it from the pending actions
-        delete this.pendingActions[id];
-
-        this.props.onFinishTransaction(wfs_response, action);
-      });
+          this.props.dispatch(finishedAction(id));
+          // remove it from the pending actions
+          delete this.pendingActions[id];
+          // let the caller know the request has errored.
+          this.props.onRequestError(error, action, id);
+        });
     }
   }
 
@@ -149,13 +162,23 @@ class WfsController extends Component {
   }
 }
 
+WfsController.propTypes = {
+  /** List of actions that need to be handled by this controller. */
+  actions: PropTypes.object,
+  /** List of map sources. */
+  sources: PropTypes.object,
+  /** onFinishTransaction callback function, called when the transaction has finished. */
+  onFinishTransaction: PropTypes.func,
+  /** onRequestError callback function, called when a request fails. */
+  onRequestError: PropTypes.func,
+};
 
 WfsController.defaultProps = {
   actions: {},
   sources: {},
   onFinishTransaction: () => {},
   onRequestError: () => {},
-}
+};
 
 function mapStateToProps(state) {
   return {

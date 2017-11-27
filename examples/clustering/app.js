@@ -5,13 +5,13 @@
  *
  */
 
-import { createStore, combineReducers, applyMiddleware } from 'redux';
+import {createStore, combineReducers, applyMiddleware} from 'redux';
 import thunkMiddleware from 'redux-thunk';
 
 import React from 'react';
 import ReactDOM from 'react-dom';
 
-import { Provider } from 'react-redux';
+import {Provider} from 'react-redux';
 
 import SdkMap from '@boundlessgeo/sdk/components/map';
 import SdkMapReducer from '@boundlessgeo/sdk/reducers/map';
@@ -25,7 +25,7 @@ import '@boundlessgeo/sdk/stylesheet/sdk.scss';
 const store = createStore(combineReducers({
   map: SdkMapReducer,
 }), window.__REDUX_DEVTOOLS_EXTENSION__ && window.__REDUX_DEVTOOLS_EXTENSION__(),
-   applyMiddleware(thunkMiddleware));
+applyMiddleware(thunkMiddleware));
 
 function main() {
   // Start with a reasonable global view of the map.
@@ -47,6 +47,7 @@ function main() {
   store.dispatch(mapActions.addLayer({
     id: 'osm',
     source: 'osm',
+    type: 'raster',
   }));
 
   // 'geojson' sources allow rendering a vector layer
@@ -87,9 +88,10 @@ function main() {
   store.dispatch(mapActions.addLayer({
     id: 'clustered-labels',
     source: 'points',
+    type: 'symbol',
     layout: {
       'text-field': '{point_count}',
-      'text-font': ['Arial'],
+      'text-font': ['Open Sans Regular'],
       'text-size': 10,
     },
     filter: ['has', 'point_count'],
@@ -158,7 +160,9 @@ function main() {
   ReactDOM.render((
     <div>
       <h3>Try it out</h3>
-      <button className="sdk-btn" onClick={() => { addRandomPoints(); }}>Add 10 random points</button>
+      <button className="sdk-btn" onClick={() => {
+        addRandomPoints();
+      }}>Add 10 random points</button>
       <p>
         <span className="input"><input type="checkbox" onChange={clusterPoints} /></span> Cluster Points
       </p>

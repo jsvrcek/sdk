@@ -18,10 +18,10 @@
 
 import PropTypes from 'prop-types';
 import React from 'react';
-import { connect } from 'react-redux';
+import {connect} from 'react-redux';
 
-import { setView } from '../actions/map';
-import { parseQueryString, encodeQueryObject } from '../util';
+import {setView} from '../actions/map';
+import {parseQueryString, encodeQueryObject} from '../util';
 
 /** Attempts to parse a given value as a floating point number.
  * @param {*} value The given value to try to parse.
@@ -127,7 +127,7 @@ export class HashHistory extends React.Component {
   }
 
   /** Encode the state for the URL hash.
-   *  @returns A call to encodeQueryObject().
+   *  @returns {string} The encoded url.
    */
   encodeState() {
     const st = this.getStateObject();
@@ -144,11 +144,16 @@ export class HashHistory extends React.Component {
 }
 
 HashHistory.propTypes = {
+  /** Map state */
   map: PropTypes.shape({
+    /** Center of the map. */
     center: PropTypes.arrayOf(PropTypes.number),
+    /** Zoom level of the map. */
     zoom: PropTypes.number,
+    /** Rotation of the map in degrees. */
     rotation: PropTypes.number,
   }),
+  /** setView callback function, called when the view needs to change. */
   setView: PropTypes.func,
 };
 

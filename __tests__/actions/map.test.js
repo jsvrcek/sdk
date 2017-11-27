@@ -5,8 +5,8 @@ import nock from 'nock';
 import thunk from 'redux-thunk';
 
 import * as actions from '../../src/actions/map';
-import { MAP } from '../../src/action-types';
-import { TITLE_KEY, TIME_KEY } from '../../src/constants';
+import {MAP} from '../../src/action-types';
+import {TITLE_KEY, TIME_KEY} from '../../src/constants';
 
 const middlewares = [thunk];
 const mockStore = configureMockStore(middlewares);
@@ -112,7 +112,9 @@ describe('actions', () => {
     };
 
     const errorMsg = 'Invalid source type: xraster.  Valid source types are vector,raster,geojson,image,video,canvas';
-    expect(() => {actions.addSource(sourceName, sourceDef)} ).toThrow(new Error(errorMsg));
+    expect(() => {
+      actions.addSource(sourceName, sourceDef);
+    }).toThrow(new Error(errorMsg));
   });
 
   it('should create an action to remove a layer', () => {
@@ -161,12 +163,37 @@ describe('actions', () => {
         },
       },
     ];
+    const position = -1;
     const expectedAction = {
       type: MAP.ADD_FEATURES,
       sourceName,
       features,
+      position
     };
     expect(actions.addFeatures(sourceName, features)).toEqual(expectedAction);
+  });
+  it('should create an action to add features at select position', () => {
+    const sourceName = 'tegola';
+    const features = [
+      {
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [102.0, 0.5],
+        },
+        properties: {
+          prop0: 'value0',
+        },
+      },
+    ];
+    const position = 4;
+    const expectedAction = {
+      type: MAP.ADD_FEATURES,
+      sourceName,
+      features,
+      position
+    };
+    expect(actions.addFeatures(sourceName, features, position)).toEqual(expectedAction);
   });
 
   it('should create an action to set layer visibility', () => {
@@ -313,10 +340,10 @@ describe('async actions', () => {
       .get('/context')
       .reply(200, body);
 
-    const expectedAction = { type: MAP.RECEIVE_CONTEXT, context: body };
+    const expectedAction = {type: MAP.RECEIVE_CONTEXT, context: body};
     const store = mockStore({});
 
-    return store.dispatch(actions.setContext({ url: 'http://example.com/context' })).then(() => {
+    return store.dispatch(actions.setContext({url: 'http://example.com/context'})).then(() => {
       // return of async actions
       expect(store.getActions()).toEqual([expectedAction]);
     });
@@ -330,7 +357,7 @@ describe('async actions', () => {
 
     const store = mockStore({});
 
-    return store.dispatch(actions.setContext({ url: 'http://example.com/context' })).then(() => {
+    return store.dispatch(actions.setContext({url: 'http://example.com/context'})).then(() => {
       // return of async actions
       expect(console.error).toHaveBeenCalled();
     });
@@ -369,10 +396,10 @@ describe('async actions', () => {
       ],
     };
 
-    const expectedAction = { type: MAP.RECEIVE_CONTEXT, context: body };
+    const expectedAction = {type: MAP.RECEIVE_CONTEXT, context: body};
     const store = mockStore({});
 
-    return store.dispatch(actions.setContext({ json: body })).then(() => {
+    return store.dispatch(actions.setContext({json: body})).then(() => {
       // return of async actions
       expect(store.getActions()).toEqual([expectedAction]);
     });
@@ -407,7 +434,7 @@ describe('async actions', () => {
   });
 
   it('should create an action to update the metadata', () => {
-    const metadata = { foo: 'bar' };
+    const metadata = {foo: 'bar'};
     const expectedAction = {
       type: MAP.UPDATE_METADATA,
       metadata,
@@ -419,7 +446,7 @@ describe('async actions', () => {
     const expected = {
       type: MAP.UPDATE_SOURCE,
       sourceName: 'points',
-      sourceDef: { data: {} },
+      sourceDef: {data: {}},
     };
     expect(actions.updateSource('points', {data: {}})).toEqual(expected);
   });
@@ -433,5 +460,101 @@ describe('async actions', () => {
       metadata,
     };
     expect(actions.setMapTime(time)).toEqual(expectedAction);
+  });
+
+  it('should create an action to move a group', () => {
+    expect(actions.moveGroup('xyz', 'x')).toEqual({
+      type: MAP.MOVE_GROUP,
+      placeAt: 'x',
+      group: 'xyz',
+    });
+  });
+
+  it('should generate a WMS source when no options specified', () => {
+    const sourceName = 'my-source';
+    const sourceDef = {
+      type: 'vector',
+      url: 'http://localhost/geoserver/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&FORMAT=application%2Fx-protobuf%3Btype%3Dmapbox-vector&TRANSPARENT=TRUE&LAYERS=my-layer&WIDTH=256&HEIGHT=256&CRS=EPSG%3A3857&BBOX={bbox-epsg-3857}',
+    };
+    expect(actions.addWmsSource(sourceName, 'http://localhost/geoserver/wms', 'my-layer')).toEqual({
+      type: MAP.ADD_SOURCE,
+      sourceName,
+      sourceDef,
+    });
+  });
+
+  it('should generate a WMS source with tileSize, accessToken and projection specified', () => {
+    const sourceName = 'my-source';
+    const sourceDef = {
+      type: 'vector',
+      url: 'http://localhost/geoserver/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&FORMAT=application%2Fx-protobuf%3Btype%3Dmapbox-vector&TRANSPARENT=TRUE&LAYERS=my-layer&WIDTH=512&HEIGHT=512&CRS=EPSG%3A4326&ACCESS_TOKEN=my-token&BBOX={bbox-epsg-3857}',
+    };
+    const options = {accessToken: 'my-token', projection: 'EPSG:4326', tileSize: 512};
+    expect(actions.addWmsSource(sourceName, 'http://localhost/geoserver/wms', 'my-layer', options)).toEqual({
+      type: MAP.ADD_SOURCE,
+      sourceName,
+      sourceDef,
+    });
+  });
+
+  it('should generate the correct WMS source when asVector false', () => {
+    const sourceName = 'my-source';
+    const sourceDef = {
+      type: 'raster',
+      tileSize: 256,
+      tiles: ['http://localhost/geoserver/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&FORMAT=image%2Fpng&TRANSPARENT=TRUE&LAYERS=my-layer&WIDTH=256&HEIGHT=256&CRS=EPSG%3A3857&BBOX={bbox-epsg-3857}'],
+    };
+    expect(actions.addWmsSource(sourceName, 'http://localhost/geoserver/wms', 'my-layer', {asVector: false})).toEqual({
+      type: MAP.ADD_SOURCE,
+      sourceName,
+      sourceDef,
+    });
+  });
+
+  it('should generate the correct WMS source when asVector false and tileSize, accessToken and projection specified', () => {
+    const sourceName = 'my-source';
+    const sourceDef = {
+      type: 'raster',
+      tileSize: 512,
+      tiles: ['http://localhost/geoserver/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&FORMAT=image%2Fpng&TRANSPARENT=TRUE&LAYERS=my-layer&WIDTH=512&HEIGHT=512&CRS=EPSG%3A4326&ACCESS_TOKEN=my-token&BBOX={bbox-epsg-3857}'],
+    };
+    const options = {asVector: false, accessToken: 'my-token', projection: 'EPSG:4326', tileSize: 512};
+    expect(actions.addWmsSource(sourceName, 'http://localhost/geoserver/wms', 'my-layer', options)).toEqual({
+      type: MAP.ADD_SOURCE,
+      sourceName,
+      sourceDef,
+    });
+  });
+
+  it('should generate the correct WFS source', () => {
+    const sourceName = 'my-source';
+    const url = 'http://localhost/geoserver/wfs';
+    const featureType = 'topp:states';
+    const options = {accessToken: 'my-token'};
+    const sourceDef = {
+      type: 'geojson',
+      data: 'http://localhost/geoserver/wfs?SERVICE=WFS&VERSION=1.1.0&SRSNAME=EPSG%3A4326&REQUEST=GetFeature&TYPENAME=topp%3Astates&OUTPUTFORMAT=JSON&ACCESS_TOKEN=my-token',
+    };
+    expect(actions.addWfsSource(sourceName, url, featureType, options)).toEqual({
+      type: MAP.ADD_SOURCE,
+      sourceName,
+      sourceDef,
+    });
+  });
+
+  it('should generate the correct TMS source', () => {
+    const sourceName = 'my-source';
+    const url = 'http://localhost/geoserver';
+    const layerName = 'topp:states';
+    const options = {accessToken: 'my-token'};
+    const sourceDef = {
+      type: 'vector',
+      url: 'http://localhost/geoserver/gwc/service/tms/1.0.0/topp:states@EPSG%3A3857@pbf/{z}/{x}/{-y}.pbf?access_token=my-token',
+    };
+    expect(actions.addTmsSource(sourceName, url, layerName, options)).toEqual({
+      type: MAP.ADD_SOURCE,
+      sourceName,
+      sourceDef,
+    });
   });
 });

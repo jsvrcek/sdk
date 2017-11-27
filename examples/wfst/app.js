@@ -5,13 +5,13 @@
  *
  */
 
-import { createStore, combineReducers, applyMiddleware } from 'redux';
+import {createStore, combineReducers, applyMiddleware} from 'redux';
 import thunkMiddleware from 'redux-thunk';
 
 import React from 'react';
 import ReactDOM from 'react-dom';
 
-import { Provider } from 'react-redux';
+import {Provider} from 'react-redux';
 
 import SdkMap from '@boundlessgeo/sdk/components/map';
 import SdkZoomControl from '@boundlessgeo/sdk/components/map/zoom-control';
@@ -41,7 +41,7 @@ const store = createStore(combineReducers({
   drawing: SdkDrawingReducer,
   wfs: SdkWfsReducer,
 }), window.__REDUX_DEVTOOLS_EXTENSION__ && window.__REDUX_DEVTOOLS_EXTENSION__(),
-   applyMiddleware(thunkMiddleware));
+applyMiddleware(thunkMiddleware));
 
 function main() {
   // Start with a reasonable global view of the map.
@@ -74,25 +74,15 @@ function main() {
     geometryName: 'geom',
   }));
 
-  // Background layers change the background color of
-  // the map. They are not attached to a source.
-  store.dispatch(SdkMapActions.addLayer({
-    id: 'background',
-    type: 'background',
-    paint: {
-      'background-color': '#eee',
-    },
-  }));
-
-
   // and an OSM layer.
   // Raster layers need not have any paint styles.
   store.dispatch(SdkMapActions.addLayer({
     id: 'osm',
     source: 'osm',
+    type: 'raster',
   }));
 
-  const colors = ['#fef0d9','#fdcc8a','#fc8d59','#e34a33','#b30000'];
+  const colors = ['#fef0d9', '#fdcc8a', '#fc8d59', '#e34a33', '#b30000'];
 
   for (let i = 0, ii = colors.length; i < ii; i++) {
     store.dispatch(SdkMapActions.addLayer({
@@ -108,20 +98,28 @@ function main() {
     }));
   }
 
-  const selectFeature = (map, coordinate, feature) => {
-    edit_panel.setState({ feature });
-  };
-
   let edit_panel = null;
 
+  const selectFeature = (map, coordinate, feature) => {
+    edit_panel.setState({feature});
+  };
+
   const updateFeature = (feature, color) => {
-    // change the color
-    feature.properties.color = color;
-    // clear the selected feature from the panel
-    edit_panel.setState({feature: null});
-    // trigger a WFS update.
-    store.dispatch(SdkWfsActions.updateFeature('tracts', feature));
-  }
+    if (feature) {
+      // change the color
+      feature.properties.color = color;
+      // clear the selected feature from the panel
+      edit_panel.setState({feature: null});
+      // trigger a WFS update.
+      store.dispatch(SdkWfsActions.updateFeature('tracts', feature));
+    }
+  };
+
+  const onError = (error, action, id) => {
+    store.dispatch(SdkDrawingActions.endSelect());
+    store.dispatch(SdkDrawingActions.startSelect('tracts'));
+    alert(error.message);
+  };
 
   const onFinish = (response, action) => {
     store.dispatch(SdkMapActions.updateSource(action.sourceName, {
@@ -149,9 +147,11 @@ function main() {
       </p>
       <SdkHashHistory store={store} />
 
-      <EditPanel onChange={ updateFeature } colors={colors} ref={ (pnl) => { edit_panel = pnl; }} />
+      <EditPanel onChange={ updateFeature } colors={colors} ref={ (pnl) => {
+        edit_panel = pnl;
+      }} />
 
-      <WfsController store={store} onFinishTransaction={ onFinish }/>
+      <WfsController store={store} onRequestError={ onError } onFinishTransaction={ onFinish }/>
     </div>
   ), document.getElementById('controls'));
 }

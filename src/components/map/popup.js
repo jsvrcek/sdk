@@ -28,8 +28,8 @@ class Popup extends React.PureComponent {
   }
 
   close() {
-    this.setState({ closed: true });
-    this.setState({ closed: true }, () => {
+    this.setState({closed: true});
+    this.setState({closed: true}, () => {
       if (this.map) {
         this.map.updatePopups();
       }
@@ -44,7 +44,9 @@ class Popup extends React.PureComponent {
   renderPopup(children) {
     let close_btn = false;
     if (this.props.closeable) {
-      close_btn = (<i tabIndex={0} role="link" onClick={() => { this.close(); }} className="sdk-popup-closer fa fa-times" />);
+      close_btn = (<i tabIndex={0} role="link" onClick={() => {
+        this.close();
+      }} className="sdk-popup-closer fa fa-times" />);
     }
     if (this.state.closed) {
       return false;
@@ -73,19 +75,25 @@ Popup.propTypes = {
   // this unused prop warning is ignored because the coordinate is
   //  a required prop to rightly render the popup on the map.
   // eslint-disable-next-line
+  /** Coordinate where to render the popup in the map. */
   coordinate: PropTypes.oneOfType([
     PropTypes.arrayOf(PropTypes.number),
     PropTypes.object,
   ]).isRequired,
+  /** Child component(s). */
   children: PropTypes.oneOfType([
     PropTypes.element,
     PropTypes.node,
     PropTypes.arrayOf(PropTypes.node),
     PropTypes.arrayOf(PropTypes.element),
   ]),
+  /** Should we be able to close the popup? */
   closeable: PropTypes.bool,
+  /** onClose callback function. */
   onClose: PropTypes.func,
+  /** Style config object. */
   style: PropTypes.object,
+  /** Css class name to apply. */
   className: PropTypes.string,
 };
 

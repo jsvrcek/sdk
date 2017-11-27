@@ -6,12 +6,12 @@
  *
  */
 
-import { createStore, combineReducers, applyMiddleware } from 'redux';
+import {createStore, combineReducers, applyMiddleware} from 'redux';
 import thunkMiddleware from 'redux-thunk';
 
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { Provider } from 'react-redux';
+import {Provider} from 'react-redux';
 
 import SdkMap from '@boundlessgeo/sdk/components/map';
 import SdkZoomControl from '@boundlessgeo/sdk/components/map/zoom-control';
@@ -26,7 +26,7 @@ import '@boundlessgeo/sdk/stylesheet/sdk.scss';
 const store = createStore(combineReducers({
   map: SdkMapReducer,
 }), window.__REDUX_DEVTOOLS_EXTENSION__ && window.__REDUX_DEVTOOLS_EXTENSION__(),
-   applyMiddleware(thunkMiddleware));
+applyMiddleware(thunkMiddleware));
 
 function main() {
   // Start with a reasonable global view of the map.
@@ -48,6 +48,7 @@ function main() {
   store.dispatch(mapActions.addLayer({
     id: 'osm',
     source: 'osm',
+    type: 'raster',
     metadata: {
       'bnd:legend-type': 'href',
       'bnd:legend-content': './osm-legend.html',
@@ -89,6 +90,7 @@ function main() {
   // some purple points!
   store.dispatch(mapActions.addLayer({
     id: 'random-points',
+    type: 'circle',
     source: 'points',
     paint: {
       'circle-radius': 5,
@@ -123,15 +125,16 @@ function main() {
   store.dispatch(mapActions.addSource('states', {
     type: 'raster',
     tileSize: 256,
-    tiles: ['https://ahocevar.com/geoserver/gwc/service/wms?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&FORMAT=image/png&SRS=EPSG:900913&LAYERS=topp:states&STYLES=&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}'],
+    tiles: ['https://demo.boundlessgeo.com/geoserver/wms?SERVICE=WMS&VERSION=1.1.1&TILED=TRUE&REQUEST=GetMap&FORMAT=image/png&SRS=EPSG:900913&LAYERS=topp:states&STYLES=&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}'],
   }));
 
   store.dispatch(mapActions.addLayer({
     id: 'states',
+    type: 'raster',
     source: 'states',
   }));
 
-   // place the map on the page.
+  // place the map on the page.
   ReactDOM.render(<Provider store={store}>
     <SdkMap>
       <SdkZoomControl />

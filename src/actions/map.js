@@ -17,8 +17,9 @@ import fetch from 'isomorphic-fetch';
  * @desc Action Defintions for the map.
  */
 
-import { MAP } from '../action-types';
-import { TITLE_KEY, TIME_KEY } from '../constants';
+import {MAP} from '../action-types';
+import {TITLE_KEY, TIME_KEY} from '../constants';
+import {encodeQueryObject} from '../util';
 
 const sourceTypes = [
   'vector',
@@ -38,7 +39,7 @@ const sourceTypes = [
 export function setView(center, zoom) {
   return {
     type: MAP.SET_VIEW,
-    view: { center, zoom },
+    view: {center, zoom},
   };
 }
 
@@ -121,8 +122,8 @@ export function addLayer(layerDef, layerTitle, positionId) {
  *  @returns {Object} Action object to pass to reducer.
  */
 export function addSource(sourceName, sourceDef) {
-  if (sourceTypes.indexOf(sourceDef.type) === -1 ) {
-    throw(new Error("Invalid source type: " + sourceDef.type + ".  Valid source types are " + sourceTypes.toString()));
+  if (sourceTypes.indexOf(sourceDef.type) === -1) {
+    throw (new Error('Invalid source type: ' + sourceDef.type + '.  Valid source types are ' + sourceTypes.toString()));
   }
   return {
     type: MAP.ADD_SOURCE,
@@ -171,7 +172,7 @@ export function updateLayer(layerId, layerDef) {
 
 /** Action to update cluster status in the map state.
  *  @param {string} sourceName Name of the source to be added.
- *  @param {boolean} isClustered
+ *  @param {boolean} isClustered Is the source clustered?
  *
  *  @returns {Object} Action object to pass to reducer.
  */
@@ -205,14 +206,16 @@ export function setClusterRadius(sourceName, radius) {
  *
  *  @param {Object} sourceName Name of the source on which the features will be added.
  *  @param {Object[]} features An array of features to add.
+ *  @param {number} position The position at which to add the features.
  *
  *  @returns {Object} Action object to pass to reducer.
  */
-export function addFeatures(sourceName, features) {
+export function addFeatures(sourceName, features, position = -1) {
   return {
     type: MAP.ADD_FEATURES,
     sourceName,
     features,
+    position,
   };
 }
 
@@ -235,7 +238,7 @@ export function removeFeatures(sourceName, filter) {
 /** Change the visibility of a given layer in the map state.
  *
  *  @param {string} layerId String id for the layer.
- *  @param {boolean} visibility
+ *  @param {boolean} visibility Should the layer be visible?
  *
  *  @returns {Object} Action object to pass to reducer.
  */
@@ -412,4 +415,121 @@ export function setMapTime(time) {
   let metadata = {};
   metadata[TIME_KEY] = time;
   return updateMetadata(metadata);
+}
+
+/** Create an action for moving a group
+ *
+ *  @param {string} group Group name.
+ *  @param {string} layerId Layer id of the new place for the layer.
+ *
+ *  @returns {object} An action object.
+ */
+export function moveGroup(group, layerId) {
+  return {
+    type: MAP.MOVE_GROUP,
+    placeAt: layerId,
+    group,
+  };
+}
+
+/** Add a WMS source.
+ *
+ * @param {string} sourceId - new ID for the source.
+ * @param {string} serverUrl - URL for the service.
+ * @param {string} layerName - WFS feature type.
+ * @param {Object} options - Optional settings. Honors: accessToken, projection, asVector, tileSize
+ *
+ * @returns {Object} Action to create a new source.
+ */
+export function addWmsSource(sourceId, serverUrl, layerName, options = {}) {
+  const tile_size = options.tileSize ? options.tileSize : 256;
+  const projection = options.projection ? options.projection : 'EPSG:3857';
+  // default behaviour is vector
+  const format = (options.asVector !== false) ? 'application/x-protobuf;type=mapbox-vector' : 'image/png';
+
+  const params = {
+    'SERVICE': 'WMS',
+    'VERSION': '1.3.0',
+    'REQUEST': 'GetMap',
+    'FORMAT': format,
+    'TRANSPARENT': 'TRUE',
+    'LAYERS': layerName,
+    'WIDTH': tile_size,
+    'HEIGHT': tile_size,
+    'CRS': projection,
+  };
+
+  if (options.accessToken) {
+    params['ACCESS_TOKEN'] = options.accessToken;
+  }
+
+  // the BBOX is not escaped because the "{" and "}" are used for string
+  // substitution in the library.
+  const url_template = `${serverUrl}?${encodeQueryObject(params)}&BBOX={bbox-epsg-3857}`;
+
+  if (options.asVector !== false) {
+    return addSource(sourceId, {
+      type: 'vector',
+      url: url_template,
+    });
+  } else {
+    return addSource(sourceId, {
+      type: 'raster',
+      tileSize: tile_size,
+      tiles: [
+        url_template,
+      ],
+    });
+  }
+}
+
+/** Add a WFS / GeoJSON source.
+ *
+ * @param {string} sourceId - new ID for the source.
+ * @param {string} serverUrl - URL for the service.
+ * @param {string} featureType - WFS feature type.
+ * @param {Object} options - Optional settings. Honors: accessToken
+ *
+ * @returns {Object} Action to create a new source.
+ */
+export function addWfsSource(sourceId, serverUrl, featureType, options = {}) {
+  const params = {
+    'SERVICE': 'WFS',
+    'VERSION': '1.1.0',
+    // projection is always fixed for WFS sources as they
+    // are reprojected on the client.
+    'SRSNAME': 'EPSG:4326',
+    'REQUEST': 'GetFeature',
+    'TYPENAME': featureType,
+    'OUTPUTFORMAT': 'JSON',
+  };
+
+  if (options.accessToken) {
+    params['ACCESS_TOKEN'] = options.accessToken;
+  }
+
+  return addSource(sourceId, {
+    type: 'geojson',
+    data: `${serverUrl}?${encodeQueryObject(params)}`
+  });
+}
+
+/** Add a Mapbox Vector Tile layer from a TMS service.
+ *
+ * @param {string} sourceId - new ID for the source.
+ * @param {string} serverUrl - URL for the service.
+ * @param {string} layerName - Name of the layer.
+ * @param {Object} options - Optional settings. Honors: accessToken
+ *
+ * @returns {Object} Action to create a new source.
+ */
+export function addTmsSource(sourceId, serverUrl, layerName, options = {}) {
+  const token_string = options.accessToken ? `access_token=${options.accessToken}` : '';
+
+  const url = `${serverUrl}/gwc/service/tms/1.0.0/${layerName}@EPSG%3A3857@pbf/{z}/{x}/{-y}.pbf?${token_string}`;
+
+  return addSource(sourceId, {
+    type: 'vector',
+    url,
+  });
 }

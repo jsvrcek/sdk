@@ -1,11 +1,11 @@
 /* global it, describe, expect */
 
 import * as util from '../../src/util';
-import {TITLE_KEY} from '../../src/constants';
+import {GROUP_KEY, TITLE_KEY} from '../../src/constants';
 
 describe('util', () => {
   it('gets layer by id', () => {
-    const layers = [{ id: 'osm', source: 'osm' }];
+    const layers = [{id: 'osm', source: 'osm'}];
     expect(util.getLayerById(layers, 'foo')).toEqual(null);
     expect(util.getLayerById(layers, 'osm')).toEqual(layers[0]);
   });
@@ -13,6 +13,28 @@ describe('util', () => {
   it('gets the layer title if no title metadata', () => {
     const layer = {id: 'osm'};
     expect(util.getLayerTitle(layer)).toEqual('osm');
+  });
+
+  it('gets the layer group', () => {
+    const metadata = {};
+    metadata[GROUP_KEY] = 'overlays';
+    const layer = {id: 'osm', metadata: metadata};
+    expect(util.getGroup(layer)).toEqual('overlays');
+  });
+
+  it('gets null for the layer group if no mapbox:group', () => {
+    const metadata = {};
+    const layer = {id: 'osm', metadata: metadata};
+    expect(util.getGroup(layer)).toEqual(null);
+  });
+
+  it('gets null for the layer group if no layer', () => {
+    expect(util.getGroup()).toEqual(null);
+  });
+
+  it('gets null for the layer group if no metadata', () => {
+    const layer = {id: 'osm'};
+    expect(util.getGroup(layer)).toEqual(null);
   });
 
   it('gets the layer title from metadata', () => {
@@ -160,17 +182,35 @@ describe('util', () => {
     expect(util.reprojectGeoJson(geoJson3857, 'EPSG:4326')).toEqual(features4326);
   });
 
-  it('tests find a layer in a list by id', () => {
-    const layers = [{
+  function getSampleLayers() {
+    return [{
       id: 'A',
+      metadata: {
+        'mapbox:group': 'grp',
+      },
     }, {
       id: 'B',
+      metadata: {
+        'mapbox:group': 'grp',
+      },
     }, {
       id: 'C',
     }];
+  }
+
+  it('tests find a layer in a list by id', () => {
+    const layers = getSampleLayers();
 
     expect(util.getLayerIndexById(layers, 'A')).toBe(0);
 
     expect(util.getLayerIndexById(layers, 'D')).toBe(-1);
+  });
+
+  it('gets a set of layers by group id', () => {
+    const layers = getSampleLayers();
+    const matches = util.getLayersByGroup(layers, 'grp');
+
+    // check to see the first two layers were found.
+    expect(matches).toEqual(layers.slice(0, 2));
   });
 });

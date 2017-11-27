@@ -5,20 +5,21 @@
  *
  */
 
-import { createStore, combineReducers } from 'redux';
+import {createStore, combineReducers} from 'redux';
 
 import React from 'react';
 import ReactDOM from 'react-dom';
-
+import {DragSource, DropTarget} from 'react-dnd';
+import {types, layerListItemSource, layerListItemTarget, collect, collectDrop} from '@boundlessgeo/sdk/components/layer-list-item';
 import SdkMap from '@boundlessgeo/sdk/components/map';
 import SdkZoomControl from '@boundlessgeo/sdk/components/map/zoom-control';
 import SdkMapReducer from '@boundlessgeo/sdk/reducers/map';
 import * as mapActions from '@boundlessgeo/sdk/actions/map';
 
 import SdkLayerList from '@boundlessgeo/sdk/components/layer-list';
-import { SdkLayerListItem } from '@boundlessgeo/sdk/components/layer-list';
+import SdkLayerListItem from '@boundlessgeo/sdk/components/layer-list-item';
 
-import { Provider } from 'react-redux';
+import {Provider} from 'react-redux';
 
 /* eslint-disable no-underscore-dangle */
 const store = createStore(combineReducers({
@@ -32,25 +33,31 @@ class LayerListItem extends SdkLayerListItem {
 
     const moveButtons = (
       <span>
-        <button className="sdk-btn" onClick={() => { this.moveLayerUp(); }}>
+        <button className="sdk-btn" onClick={() => {
+          this.moveLayerUp();
+        }}>
           { this.props.labels.up }
         </button>
-        <button className="sdk-btn" onClick={() => { this.moveLayerDown(); }}>
+        <button className="sdk-btn" onClick={() => {
+          this.moveLayerDown();
+        }}>
           { this.props.labels.down }
         </button>
-        <button className="sdk-btn" onClick={() => { this.removeLayer(); }}>
+        <button className="sdk-btn" onClick={() => {
+          this.removeLayer();
+        }}>
           { this.props.labels.remove }
         </button>
       </span>
     );
 
-    return (
+    return  this.props.connectDragSource(this.props.connectDropTarget((
       <li className="layer">
         <span className="checkbox">{checkbox}</span>
         <span className="name">{layer.id}</span>
         <span className="btn-container">{moveButtons}</span>
       </li>
-    );
+    )));
   }
 }
 
@@ -62,9 +69,32 @@ LayerListItem.defaultProps = {
   },
 };
 
+LayerListItem = DropTarget(types, layerListItemTarget, collectDrop)(DragSource(types, layerListItemSource, collect)(LayerListItem));
+
 function main() {
   // Start with a reasonable global view of hte map.
   store.dispatch(mapActions.setView([-93, 45], 2));
+
+  store.dispatch(mapActions.updateMetadata({
+    'mapbox:groups': {
+      base: {
+        name: 'Base Maps',
+      },
+    },
+  }));
+
+  // Background layers change the background color of
+  // the map. They are not attached to a source.
+  store.dispatch(mapActions.addLayer({
+    id: 'background',
+    type: 'background',
+    paint: {
+      'background-color': '#eee',
+    },
+    metadata: {
+      'bnd:hide-layerlist': true,
+    },
+  }));
 
   // add the OSM source
   store.dispatch(mapActions.addSource('osm', {
@@ -82,12 +112,40 @@ function main() {
   store.dispatch(mapActions.addLayer({
     id: 'osm',
     source: 'osm',
+    type: 'raster',
+    metadata: {
+      'mapbox:group': 'base'
+    }
+  }));
+
+  // add carto source
+  store.dispatch(mapActions.addSource('cartolight', {
+    attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="http://cartodb.com/attributions">CartoDB</a>',
+    type: 'raster',
+    tileSize: 256,
+    tiles: [
+      'http://s.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+    ],
+  }));
+
+  // add an carto light layer
+  store.dispatch(mapActions.addLayer({
+    metadata: {
+      'mapbox:group': 'base',
+      'bnd:title': 'CartoDB light',
+    },
+    type: 'raster',
+    layout: {
+      visibility: 'none',
+    },
+    id: 'cartolight',
+    source: 'cartolight',
   }));
 
   // 'geojson' sources allow rendering a vector layer
   // with all the features stored as GeoJSON. "data" can
   // be an individual Feature or a FeatureCollection.
-  store.dispatch(mapActions.addSource('dynamic-source', { type: 'geojson' }));
+  store.dispatch(mapActions.addSource('dynamic-source', {type: 'geojson'}));
 
   store.dispatch(mapActions.addLayer({
     id: 'dynamic-layer',
@@ -103,7 +161,7 @@ function main() {
   // This is called by the onClick, keeping the onClick HTML clean
   const runFetchGeoJSON = () => {
     store.dispatch(mapActions.addSource('dynamic-source',
-      { type: 'geojson', data: './data/airports.json' }));
+      {type: 'geojson', data: './data/airports.json'}));
   };
   runFetchGeoJSON();
   // 'geojson' sources allow rendering a vector layer
@@ -166,6 +224,7 @@ function main() {
   store.dispatch(mapActions.addLayer({
     id: 'states',
     source: 'states',
+    type: 'raster',
   }));
 
   // place the map on the page.

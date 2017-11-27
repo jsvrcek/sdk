@@ -14,16 +14,16 @@
 import fetch from 'isomorphic-fetch';
 import PropTypes from 'prop-types';
 import React from 'react';
-import { connect } from 'react-redux';
+import {connect} from 'react-redux';
 import OlRender from 'ol/render';
 import LineString from 'ol/geom/linestring';
 import Polygon from 'ol/geom/polygon';
 import Point from 'ol/geom/point';
 import Feature from 'ol/feature';
 import VectorLayer from 'ol/layer/vector';
-import { applyStyle } from 'ol-mapbox-style';
-import { jsonClone, getLayerById, parseQueryString, encodeQueryObject } from '../util';
-import { getFakeStyle, hydrateLayer } from './map';
+import {applyStyle} from 'ol-mapbox-style';
+import {jsonClone, getLayerById, parseQueryString, encodeQueryObject} from '../util';
+import {getFakeStyle, hydrateLayer} from './map';
 
 /** @module components/legend
  * @desc React Component to render the legend data.
@@ -53,21 +53,23 @@ import { getFakeStyle, hydrateLayer } from './map';
  */
 function getRemoteLegend(href) {
   let ref = null;
-  const div = (<div ref={(me) => { ref = me; }} />);
+  const div = (<div ref={(me) => {
+    ref = me;
+  }} />);
 
   // kick off the href fun!
   fetch(href).then(response => response.text())
-  .then((html) => {
+    .then((html) => {
     // This is equivalent to dangerouslySetInnerHTML
-    if (ref !== null) {
-      ref.innerHTML = html;
-    }
-  });
+      if (ref !== null) {
+        ref.innerHTML = html;
+      }
+    });
 
   return div;
 }
 
-/** 
+/**
  *   @param {Object} layer Mapbox GL layer.
  *
  *   @returns {(Object|null)} A <div> or <img> element, or null.
@@ -106,7 +108,7 @@ export function getLineGeometry(size) {
     const center = [size[0] / 2, size[1] / 2];
     lineGeomCache[size] = new LineString([
       [-8 + center[0], -3 + center[1]],
-      [-3 + center[0] , 3 + center[1]],
+      [-3 + center[0], 3 + center[1]],
       [3 + center[0], -3 + center[1]],
       [8 + center[0], 3 + center[1]]
     ]);
@@ -208,7 +210,7 @@ export function getRasterLegend(layer, layer_src) {
 }
 
 
-class Legend extends React.Component {
+export class Legend extends React.Component {
 
   constructor(props) {
     super(props);
@@ -244,7 +246,7 @@ class Legend extends React.Component {
             props.mapbox.accessToken
           );
           const olLayer = new VectorLayer();
-          const me = this;  
+          const me = this;
           applyStyle(olLayer, fake_style, layer.source).then(function() {
             const styleFn = olLayer.getStyle();
             let geom;
@@ -345,19 +347,31 @@ class Legend extends React.Component {
 }
 
 Legend.propTypes = {
+  /** The id of the layer for which this legend is meant. */
   layerId: PropTypes.string.isRequired,
+  /** List of layers from the store. */
   layers: PropTypes.arrayOf(PropTypes.object),
+  /** List of layer sources. */
   sources: PropTypes.shape({
+    /** Source to associate with the layer. */
     source: PropTypes.string,
   }),
+  /** Mapbox specific configuration. */
   mapbox: PropTypes.shape({
+    /** Base url to use when substituting mapbox:// type urls. */
     baseUrl: PropTypes.string,
+    /** Access token of the mapbox account to use. */
     accessToken: PropTypes.string,
   }),
+  /** Sprite sheet url. */
   sprite: PropTypes.string,
+  /** If legend is empty, show this message. */
   emptyLegendMessage: PropTypes.string,
+  /** Size of the legend, only used for vector legends. */
   size: PropTypes.arrayOf(PropTypes.number),
+  /** Style config object. */
   style: PropTypes.object,
+  /** Css classname to apply. */
   className: PropTypes.string,
 };
 

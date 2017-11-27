@@ -2,9 +2,8 @@
 
 import deepFreeze from 'deep-freeze';
 
-import proj from 'ol/proj';
 import reducer from '../../src/reducers/map';
-import { MAP } from '../../src/action-types';
+import {MAP} from '../../src/action-types';
 import * as MapActions from '../../src/actions/map';
 
 
@@ -62,7 +61,6 @@ describe('map reducer', () => {
           metadata: {
             'bnd:title': title,
           },
-          filter: null,
         },
       ],
     });
@@ -304,7 +302,7 @@ describe('map reducer', () => {
       id: 'layer1',
       source: 'source1',
       metadata: {
-       'mapbox:group': 'baselayer',
+        'mapbox:group': 'baselayer',
       },
     };
     const layer2 = {
@@ -314,7 +312,7 @@ describe('map reducer', () => {
         visibility: 'none',
       },
       metadata: {
-       'mapbox:group': 'baselayer',
+        'mapbox:group': 'baselayer',
       },
     };
     deepFreeze(layer1);
@@ -679,7 +677,7 @@ describe('map reducer', () => {
       zoom: 3,
       bearing: 0,
       sources: {
-        radar: { ...image_source },
+        radar: {...image_source},
       },
       metadata: {
         'bnd:source-version': 1,
@@ -730,238 +728,6 @@ describe('map reducer', () => {
       metadata: {
         'bnd:source-version': 1,
         'bnd:layer-version': 0,
-      },
-      layers: [],
-    });
-  });
-
-  it('should handle ADD_FEATURES to add action features to a source featureCollection', () => {
-    // since we do not go through ADD_SOURCE we need to set _dataVersion
-    // eslint-disable-next-line
-    const source = {data: {type:'FeatureCollection',crs:{type:'name',properties:{'name':'urn:ogc:def:crs:OGC:1.3:CRS84'}},features:[{type:'Feature',properties:{'n':2,'cat':1},geometry:{type:'Point',coordinates:[0.5,0.5]}},{type:'Feature',properties:{'n':3,'cat':2},'geometry':{type:'Point',coordinates:[0.5,1.5]}}]}};
-    deepFreeze(source);
-    const action = {
-      type: MAP.ADD_FEATURES,
-      sourceName: 'points',
-      // eslint-disable-next-line
-      features: [{type:'Feature',properties:{'n':27,'cat':2},geometry:{type:'Point',coordinates:[2.5,5.5]}},{type:'Feature',properties:{'n':28,'cat':1},'geometry':{type:'Point',coordinates:[2.5,6.5]}}]
-    };
-    deepFreeze(action);
-    const state = {
-      version: 8,
-      name: 'default',
-      center: [0, 0],
-      zoom: 3,
-      sources: {
-        points: source,
-      },
-      metadata: {
-        'bnd:source-version': 0,
-        'bnd:layer-version': 0,
-      },
-      layers: [],
-    };
-    deepFreeze(state);
-    // eslint-disable-next-line
-    const newSource = {data: {type:'FeatureCollection',crs:{type:'name',properties:{'name':'urn:ogc:def:crs:OGC:1.3:CRS84'}},features:[{type:'Feature',properties:{'n':2,'cat':1},geometry:{type:'Point',coordinates:[0.5,0.5]}},{type:'Feature',properties:{'n':3,'cat':2},'geometry':{type:'Point',coordinates:[0.5,1.5]}},{type:'Feature',properties:{'n':27,'cat':2},'geometry':{type:'Point',coordinates:[2.5,5.5]}},{type:'Feature',properties:{'n':28,'cat':1},'geometry':{type:'Point',coordinates:[2.5,6.5]}}]}};
-    deepFreeze(newSource);
-    expect(reducer(state, action)).toEqual({
-      version: 8,
-      name: 'default',
-      center: [0, 0],
-      zoom: 3,
-      metadata: {
-        'bnd:source-version': 0,
-        'bnd:layer-version': 0,
-        'bnd:data-version:points': 1,
-      },
-      sources: {
-        points: newSource,
-      },
-      layers: [],
-    });
-  });
-
-  it('should handle ADD_FEATURES with unknown type', () => {
-    // since we do not go through ADD_SOURCE we need to set _dataVersion
-    // eslint-disable-next-line
-    const source = {data: {type:'Foo'}};
-    deepFreeze(source);
-    const action = {
-      type: MAP.ADD_FEATURES,
-      sourceName: 'points',
-      // eslint-disable-next-line
-      features: [{type:'Feature',properties:{'n':27,'cat':2},geometry:{type:'Point',coordinates:[2.5,5.5]}},{type:'Feature',properties:{'n':28,'cat':1},'geometry':{type:'Point',coordinates:[2.5,6.5]}}]
-    };
-    deepFreeze(action);
-    const state = {
-      version: 8,
-      name: 'default',
-      center: [0, 0],
-      zoom: 3,
-      sources: {
-        points: source,
-      },
-      metadata: {
-        'bnd:source-version': 0,
-        'bnd:layer-version': 0,
-      },
-      layers: [],
-    };
-    deepFreeze(state);
-    // since type is not known, it returns the passed in state
-    expect(reducer(state, action)).toEqual(state);
-  });
-
-  it('should handle ADD_FEATURES to add action features to a source feature', () => {
-    // since we do not go through ADD_SOURCE we need to set _dataVersion
-    // eslint-disable-next-line
-    const source = {data: {type:'Feature', properties:{'n':29,'cat':4}, geometry:{type:'Point', coordinates:[1.0,7.5]}}};
-    deepFreeze(source);
-    const action = {
-      type: MAP.ADD_FEATURES,
-      sourceName: 'points',
-      // eslint-disable-next-line
-      features: [{type:'Feature',properties:{'n':27,'cat':2},geometry:{type:'Point',coordinates:[2.5,5.5]}},{type:'Feature',properties:{'n':28,'cat':1},'geometry':{type:'Point',coordinates:[2.5,6.5]}}]
-    };
-    deepFreeze(action);
-    const state = {
-      version: 8,
-      name: 'default',
-      center: [0, 0],
-      zoom: 3,
-      sources: {
-        points: source,
-      },
-      metadata: {
-        'bnd:source-version': 0,
-        'bnd:layer-version': 0,
-      },
-      layers: [],
-    };
-    deepFreeze(state);
-    // eslint-disable-next-line
-    const newSource = {data: {type:'FeatureCollection', features: [source.data].concat(action.features)}};
-    deepFreeze(newSource);
-    expect(reducer(state, action)).toEqual({
-      version: 8,
-      name: 'default',
-      center: [0, 0],
-      zoom: 3,
-      metadata: {
-        'bnd:source-version': 0,
-        'bnd:layer-version': 0,
-        'bnd:data-version:points': 1,
-      },
-      sources: {
-        points: newSource,
-      },
-      layers: [],
-    });
-  });
-
-  it('should reproject when handling ADD_FEATURES with a full feature collection', () => {
-    // since we do not go through ADD_SOURCE we need to set _dataVersion
-    // eslint-disable-next-line
-    const source = {data: {type:'Feature', properties:{'n':29,'cat':4}, geometry:{type:'Point', coordinates:[1.0,7.5]}}};
-    deepFreeze(source);
-    const geom1 = [2000,2000];
-    deepFreeze(geom1);
-    const reprojectedGeom1 = proj.toLonLat(geom1);
-    deepFreeze(reprojectedGeom1);
-    const geom2 = [2000000,200000];
-    deepFreeze(geom2);
-    const reprojectedGeom2 = proj.toLonLat(geom2);
-    deepFreeze(reprojectedGeom2);
-    const action = {
-      type: MAP.ADD_FEATURES,
-      sourceName: 'points',
-      // eslint-disable-next-line
-      features: {type: 'FeatureCollection', crs:{type:'name',properties:{'name':'urn:ogc:def:crs:EPSG::3857'}},features: [{type:'Feature',properties:{'n':27,'cat':2},geometry:{type:'Point',coordinates:geom1}},{type:'Feature',properties:{'n':28,'cat':1},'geometry':{type:'Point',coordinates:geom2}}]}
-    };
-    deepFreeze(action);
-    const state = {
-      version: 8,
-      name: 'default',
-      center: [0, 0],
-      zoom: 3,
-      sources: {
-        points: source,
-      },
-      metadata: {
-        'bnd:source-version': 0,
-        'bnd:layer-version': 0,
-      },
-      layers: [],
-    };
-    deepFreeze(state);
-    const reprojectedFeatures = [{"geometry": {"coordinates": reprojectedGeom1, "type": "Point"}, "properties": {"cat": 2, "n": 27}, "type": "Feature"}, {"geometry": {"coordinates": reprojectedGeom2, "type": "Point"}, "properties": {"cat": 1, "n": 28}, "type": "Feature"}];
-    // eslint-disable-next-line
-    const newSource = {data: {type:'FeatureCollection', features: [source.data].concat(reprojectedFeatures)}};
-    deepFreeze(newSource);
-    expect(reducer(state, action)).toEqual({
-      version: 8,
-      name: 'default',
-      center: [0, 0],
-      zoom: 3,
-      metadata: {
-        'bnd:source-version': 0,
-        'bnd:layer-version': 0,
-        'bnd:data-version:points': 1,
-      },
-      sources: {
-        points: newSource,
-      },
-      layers: [],
-    });
-  });
-
-  it('should handle ADD_FEATURES to add action features to a source with no data', () => {
-    // since we do not go through ADD_SOURCE we need to set _dataVersion
-    const source = {};
-    deepFreeze(source);
-    const action = {
-      type: MAP.ADD_FEATURES,
-      sourceName: 'points',
-      // eslint-disable-next-line
-      features: [{type:'Feature',properties:{'n':27,'cat':2},geometry:{type:'Point',coordinates:[2.5,5.5]}},{type:'Feature',properties:{'n':28,'cat':1},'geometry':{type:'Point',coordinates:[2.5,6.5]}}]
-    };
-    deepFreeze(action);
-    const state = {
-      version: 8,
-      name: 'default',
-      center: [0, 0],
-      zoom: 3,
-      sources: {
-        points: source,
-      },
-      metadata: {
-        'bnd:source-version': 0,
-        'bnd:layer-version': 0,
-      },
-      layers: [],
-    };
-    deepFreeze(state);
-    expect(reducer(state, action)).toEqual({
-      version: 8,
-      name: 'default',
-      center: [0, 0],
-      zoom: 3,
-      metadata: {
-        'bnd:source-version': 0,
-        'bnd:layer-version': 0,
-        'bnd:data-version:points': 1,
-      },
-      sources: {
-        points: {
-          ...source,
-          data: {
-            features: [
-              ...action.features,
-            ],
-            type: 'FeatureCollection',
-          },
-        },
       },
       layers: [],
     });
@@ -1226,7 +992,7 @@ describe('map reducer', () => {
       name: 'default',
       center: [0, 0],
       zoom: 3,
-      sources: { points: source },
+      sources: {points: source},
       layers: [layer],
     };
     const action = {
@@ -1240,9 +1006,9 @@ describe('map reducer', () => {
       name: 'default',
       center: [0, 0],
       zoom: 3,
-      sources: { points: { data: { type: 'FeatureCollection', features: [] }, cluster: true, clusterRadius: 50 } },
-      layers: [{ id: 'my-points', source: 'points' }],
-      metadata: { 'bnd:source-version': 1 },
+      sources: {points: {data: {type: 'FeatureCollection', features: []}, cluster: true, clusterRadius: 50}},
+      layers: [{id: 'my-points', source: 'points'}],
+      metadata: {'bnd:source-version': 1},
     });
   });
 
@@ -1264,7 +1030,7 @@ describe('map reducer', () => {
       name: 'default',
       center: [0, 0],
       zoom: 3,
-      sources: { points: source },
+      sources: {points: source},
       layers: [layer],
     };
     const action = {
@@ -1279,9 +1045,9 @@ describe('map reducer', () => {
       name: 'default',
       center: [0, 0],
       zoom: 3,
-      sources: { points: { data: { type: 'FeatureCollection', features: [] }, cluster: true, clusterRadius: 10 } },
-      layers: [{ id: 'my-points', source: 'points' }],
-      metadata: { 'bnd:source-version': 1 },
+      sources: {points: {data: {type: 'FeatureCollection', features: []}, cluster: true, clusterRadius: 10}},
+      layers: [{id: 'my-points', source: 'points'}],
+      metadata: {'bnd:source-version': 1},
     });
   });
 
@@ -1319,15 +1085,53 @@ describe('map reducer', () => {
       },
       layers: [],
     });
-  })
+  });
+
+  it('should update a geojson source', () => {
+    const state = {
+      version: 8,
+      name: 'default',
+      center: [0, 0],
+      zoom: 3,
+      sources: {
+        points: {
+          type: 'geojson',
+          data: 'http://myurl?',
+        },
+      },
+      layers: [],
+    };
+    deepFreeze(state);
+
+    const action = MapActions.updateSource('points', {
+      data: 'http://myurl2?',
+    });
+
+    expect(reducer(state, action)).toEqual({
+      version: 8,
+      name: 'default',
+      center: [0, 0],
+      zoom: 3,
+      metadata: {
+        'bnd:data-version:points': 1,
+      },
+      sources: {
+        points: {
+          type: 'geojson',
+          data: 'http://myurl2?',
+        },
+      },
+      layers: [],
+    });
+  });
 });
 
 describe('map reducer - placing layers', () => {
   // setup four "dummy" layers
-  const layer_a = { id: 'layer_a', source: 'dummy' };
-  const layer_b = { id: 'layer_b', source: 'dummy' };
-  const layer_c = { id: 'layer_c', source: 'dummy' };
-  const layer_d = { id: 'layer_d', source: 'dummy' };
+  const layer_a = {id: 'layer_a', source: 'dummy'};
+  const layer_b = {id: 'layer_b', source: 'dummy'};
+  const layer_c = {id: 'layer_c', source: 'dummy'};
+  const layer_d = {id: 'layer_d', source: 'dummy'};
 
   // ensure the layers themselves are never changed.
   deepFreeze(layer_a);
@@ -1379,5 +1183,133 @@ describe('map reducer - placing layers', () => {
 
   it('moves a layer to the middle', () => {
     runOrderTest('layer_d', 'layer_b', [layer_a, layer_d, layer_b, layer_c]);
+  });
+});
+
+describe('map reducer - placing layers with groups', () => {
+  // setup 5 "dummy" layers
+  const metadata = {};
+  metadata['mapbox:group'] = 'foo';
+  const layer_a = {id: 'layer_a', source: 'dummy', metadata};
+  const layer_b = {id: 'layer_b', source: 'dummy', metadata};
+  const layer_c = {id: 'layer_c', source: 'dummy'};
+  const layer_d = {id: 'layer_d', source: 'dummy'};
+  const layer_e = {id: 'layer_e', source: 'dummy'};
+
+  // ensure the layers themselves are never changed.
+  deepFreeze(layer_a);
+  deepFreeze(layer_b);
+  deepFreeze(layer_c);
+  deepFreeze(layer_d);
+  deepFreeze(layer_e);
+
+  let state = null;
+
+  // reset the state each time.
+  beforeEach(() => {
+    state = {
+      version: 8,
+      name: 'default',
+      center: [0, 0],
+      zoom: 3,
+      sources: {
+        dummy: { },
+      },
+      layers: [layer_a, layer_b, layer_c, layer_d, layer_e],
+      metadata: {
+        'bnd:source-version': 0,
+        'bnd:layer-version': 0,
+      },
+    };
+    deepFreeze(state);
+  });
+
+  // This is a meta function for the various order tests.
+  function runOrderTest(layerId, targetId, expectedOrder, layerVersion) {
+    const new_state = reducer(state, MapActions.orderLayer(layerId, targetId));
+    const expected_state = Object.assign({}, state, {
+      metadata: {
+        'bnd:source-version': 0,
+        'bnd:layer-version': layerVersion !== undefined ? layerVersion : 1,
+      },
+      layers: expectedOrder,
+    });
+    expect(new_state).toEqual(expected_state);
+  }
+
+  it('moves layer_c one down', () => {
+    runOrderTest('layer_c', 'layer_b', [layer_c, layer_a, layer_b, layer_d, layer_e]);
+  });
+
+  it('prevents layer_a from moving out of the group', () => {
+    runOrderTest('layer_a', 'layer_c', [layer_a, layer_b, layer_c, layer_d, layer_e], 0);
+  });
+
+  it('allows layer_a to move inside of the group', () => {
+    runOrderTest('layer_a', 'layer_b', [layer_b, layer_a, layer_c, layer_d, layer_e]);
+  });
+});
+
+describe('map reducer - placing layers with groups (reverse sequence)', () => {
+  // setup 5 "dummy" layers
+  const metadata = {};
+  metadata['mapbox:group'] = 'foo';
+  const layer_a = {id: 'layer_a', source: 'dummy', metadata};
+  const layer_b = {id: 'layer_b', source: 'dummy', metadata};
+  const layer_c = {id: 'layer_c', source: 'dummy'};
+  const layer_d = {id: 'layer_d', source: 'dummy'};
+  const layer_e = {id: 'layer_e', source: 'dummy'};
+
+  // ensure the layers themselves are never changed.
+  deepFreeze(layer_a);
+  deepFreeze(layer_b);
+  deepFreeze(layer_c);
+  deepFreeze(layer_d);
+  deepFreeze(layer_e);
+
+  let state = null;
+
+  // reset the state each time.
+  beforeEach(() => {
+    state = {
+      version: 8,
+      name: 'default',
+      center: [0, 0],
+      zoom: 3,
+      sources: {
+        dummy: { },
+      },
+      layers: [layer_e, layer_d, layer_c, layer_b, layer_a],
+      metadata: {
+        'bnd:source-version': 0,
+        'bnd:layer-version': 0,
+      },
+    };
+    deepFreeze(state);
+  });
+
+  // This is a meta function for the various order tests.
+  function runOrderTest(layerId, targetId, expectedOrder, layerVersion) {
+    const new_state = reducer(state, MapActions.orderLayer(layerId, targetId));
+    const expected_state = Object.assign({}, state, {
+      metadata: {
+        'bnd:source-version': 0,
+        'bnd:layer-version': layerVersion !== undefined ? layerVersion : 1,
+      },
+      layers: expectedOrder,
+    });
+    expect(new_state).toEqual(expected_state);
+  }
+
+  it('moves layer_c one up', () => {
+    runOrderTest('layer_c', 'layer_b', [layer_e, layer_d, layer_b, layer_a, layer_c]);
+  });
+
+  it('prevents layer_a from moving out of the group', () => {
+    runOrderTest('layer_a', 'layer_c', [layer_e, layer_d, layer_c, layer_b, layer_a], 0);
+  });
+
+  it('allows layer_a to move inside of the group', () => {
+    runOrderTest('layer_a', 'layer_b', [layer_e, layer_d, layer_c, layer_a, layer_b]);
   });
 });

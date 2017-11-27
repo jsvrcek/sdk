@@ -11,101 +11,106 @@
  * under the License.
  */
 
-/** SDK Layerlist Component
- */
-
 import React from 'react';
-import { connect } from 'react-redux';
+import {connect} from 'react-redux';
 import PropTypes from 'prop-types';
+import HTML5Backend from 'react-dnd-html5-backend';
+import {DragDropContext} from 'react-dnd';
+import {LAYERLIST_HIDE_KEY, GROUP_KEY, GROUPS_KEY} from '../constants';
+import {getLayerIndexById} from '../util';
+import {SdkLayerListItemDD} from './layer-list-item';
 
-import { getLayerIndexById, isLayerVisible, getLayerTitle } from '../util';
-
-import * as mapActions from '../actions/map';
-import {GROUP_KEY, GROUPS_KEY} from '../constants';
-
-export class SdkLayerListItem extends React.Component {
-
-  moveLayer(layerId, targetId) {
-    this.props.dispatch(mapActions.orderLayer(layerId, targetId));
-  }
-
-  moveLayerUp() {
-    const layer_id = this.props.layer.id;
-    const index = getLayerIndexById(this.props.layers, layer_id);
-    if (index < this.props.layers.length - 1) {
-      this.moveLayer(this.props.layers[index + 1].id, layer_id);
-    }
-  }
-
-  moveLayerDown() {
-    const layer_id = this.props.layer.id;
-    const index = getLayerIndexById(this.props.layers, layer_id);
-    if (index > 0) {
-      this.moveLayer(layer_id, this.props.layers[index - 1].id);
-    }
-  }
-
-  removeLayer() {
-    this.props.dispatch(mapActions.removeLayer(this.props.layer.id));
-  }
-
-  toggleVisibility() {
-    const shown = isLayerVisible(this.props.layer);
-    if (this.props.exclusive) {
-      this.props.dispatch(mapActions.setLayerInGroupVisible(this.props.layer.id, this.props.groupId));
-    } else {
-      this.props.dispatch(mapActions.setLayerVisibility(this.props.layer.id, shown ? 'none' : 'visible'));
-    }
-  }
-
-  getVisibilityControl() {
-    const layer = this.props.layer;
-    const is_checked = isLayerVisible(layer);
-    if (this.props.exclusive) {
-      return (
-        <input
-          type="radio"
-          name={this.props.groupId}
-          onChange={() => { this.toggleVisibility(); }}
-          checked={is_checked}
-        />
-      );
-    } else {
-      return (
-        <input
-          type="checkbox"
-          onChange={() => { this.toggleVisibility(); }}
-          checked={is_checked}
-        />
-      );
-    }
-  }
-
+export class SdkList extends React.Component {
   render() {
-    const layer = this.props.layer;
-    const checkbox = this.getVisibilityControl();
     return (
-      <li className="sdk-layer" key={layer.id}>
-        <span className="sdk-checkbox">{checkbox}</span>
-        <span className="sdk-name">{getLayerTitle(this.props.layer)}</span>
-      </li>
+      <ul style={this.props.style} className={this.props.className}>
+        {this.props.children}
+      </ul>
     );
   }
 }
 
-SdkLayerListItem.PropTypes = {
-  exclusive: PropTypes.bool,
-  groupId: PropTypes.string,
-  layer: PropTypes.shape({
-    id: PropTypes.string,
-  }).isRequired,
+SdkList.PropTypes = {
+  style: PropTypes.object,
+  className: PropTypes.string,
+  children: PropTypes.oneOfType([
+    PropTypes.arrayOf(PropTypes.node),
+    PropTypes.node
+  ])
 };
 
+export class SdkLayerListGroup extends React.Component {
+
+  render() {
+    const children = [];
+    for (let i = 0, ii = this.props.childLayers.length; i < ii; i++) {
+      children.push(
+        <this.props.layerClass
+          enableDD={this.props.enableDD}
+          exclusive={this.props.group.exclusive}
+          key={i}
+          index={getLayerIndexById(this.props.layers, this.props.childLayers[i].id)}
+          groupLayers={this.props.childLayers}
+          layers={this.props.layers}
+          layer={this.props.childLayers[i]}
+          groupId={this.props.groupId}
+        />
+      );
+    }
+
+    return (<li>{this.props.group.name}<ul>{children}</ul></li>);
+  }
+}
+
+SdkLayerListGroup.PropTypes = {
+  enableDD: PropTypes.bool,
+  groupId: PropTypes.string.isRequired,
+  group: PropTypes.shape({
+    name: PropTypes.string,
+    exclusive: PropTypes.bool,
+  }).isRequired,
+  layerClass: PropTypes.func.isRequired,
+  childLayers: PropTypes.arrayOf(PropTypes.shape({
+    id: PropTypes.string,
+  })).isRequired,
+  layers: PropTypes.arrayOf(PropTypes.shape({
+    id: PropTypes.string,
+  })).isRequired,
+};
+
+/** @module components/layer-list
+ *
+ * @desc Provides a layer list control.
+ */
 class SdkLayerList extends React.Component {
   constructor(props) {
     super(props);
 
+    this.groupClass = connect()(this.props.groupClass);
     this.layerClass = connect()(this.props.layerClass);
+  }
+
+  addGroup(layers, groupName, groups, group_layers) {
+    layers.unshift(
+      <this.groupClass
+        enableDD={this.props.enableDD}
+        key={groupName}
+        groupId={groupName}
+        group={groups[groupName]}
+        childLayers={group_layers}
+        layers={this.props.layers}
+        layerClass={this.layerClass}
+      />
+    );
+  }
+
+  handlePendingGroup(layers, group_layers, groupName, groups) {
+    if (group_layers && group_layers.length) {
+      this.addGroup(layers, groupName, groups, group_layers);
+      // reset group_layers
+      group_layers = [];
+    }
+    return group_layers;
   }
 
   render() {
@@ -113,50 +118,74 @@ class SdkLayerList extends React.Component {
     if (this.props.className) {
       className = `${className} ${this.props.className}`;
     }
-    let i;
     const layers = [];
     const groups = this.props.metadata ? this.props.metadata[GROUPS_KEY] : undefined;
-    const layersHash = {};
-    if (groups) {
-      for (var key in groups) {
-        const children = [];
-        for (i = this.props.layers.length - 1; i >= 0; i--) {
-          const item = this.props.layers[i];
-          if (item.metadata && item.metadata[GROUP_KEY] === key) {
-            layersHash[item.id] = true;
-            children.push(<this.layerClass exclusive={groups[key].exclusive} groupId={key} key={i} layers={this.props.layers} layer={item} />);
+    let groupName, group_layers;
+    for (let i = 0, ii = this.props.layers.length; i < ii; i++) {
+      const item = this.props.layers[i];
+      if (item.metadata && item.metadata[GROUP_KEY]) {
+        if (groupName !== item.metadata[GROUP_KEY]) {
+          if (group_layers && group_layers.length > 0) {
+            this.addGroup(layers, groupName, groups, group_layers);
           }
+          group_layers = [];
         }
-        if (children.length > 0) {
-          layers.push(<li key={key}>{groups[key].name}<ul>{children}</ul></li>);
+        groupName = item.metadata[GROUP_KEY];
+        if (item.metadata[LAYERLIST_HIDE_KEY] !== true) {
+          group_layers.unshift(item);
         }
+      } else if (!item.metadata || item.metadata[LAYERLIST_HIDE_KEY] !== true) {
+        group_layers = this.handlePendingGroup(layers, group_layers, groupName, groups);
+        layers.unshift(<this.layerClass enableDD={this.props.enableDD} index={i} key={i} layers={this.props.layers} layer={item} />);
       }
     }
-    for (i = this.props.layers.length - 1; i >= 0; i--) {
-      const layer = this.props.layers[i];
-      if (!layersHash[layer.id]) {
-        layers.push(<this.layerClass key={i} layers={this.props.layers} layer={layer} />);
-      }
-    }
+    group_layers = this.handlePendingGroup(layers, group_layers, groupName, groups);
     return (
-      <ul style={this.props.style} className={className}>
+      <this.props.listClass style={this.props.style} className={className}>
         { layers }
-      </ul>
+      </this.props.listClass>
     );
   }
 }
 
 SdkLayerList.propTypes = {
+  /**
+   * Should we enable drag and drop for reordering?
+   */
+  enableDD: PropTypes.bool,
+  /**
+   * React.Component to use for rendering layer groups.
+   */
+  groupClass: PropTypes.func,
+  /**
+   * React.Component to use for rendering layers.
+   */
   layerClass: PropTypes.func,
+  /**
+   * React.Component to use for rendering lists. The default implementation uses <ul>.
+   */
+  listClass: PropTypes.func,
+  /**
+   * List of layers to use.
+   */
   layers: PropTypes.arrayOf(PropTypes.shape({
     id: PropTypes.string,
   })).isRequired,
+  /**
+   * Style config object for the root element.
+   */
   style: PropTypes.object,
+  /**
+   * Css className for the root element.
+   */
   className: PropTypes.string,
 };
 
 SdkLayerList.defaultProps = {
-  layerClass: SdkLayerListItem,
+  enableDD: true,
+  layerClass: SdkLayerListItemDD,
+  groupClass: SdkLayerListGroup,
+  listClass: SdkList,
 };
 
 function mapStateToProps(state) {
@@ -166,4 +195,5 @@ function mapStateToProps(state) {
   };
 }
 
+SdkLayerList = DragDropContext(HTML5Backend)(SdkLayerList);
 export default connect(mapStateToProps)(SdkLayerList);

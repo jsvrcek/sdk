@@ -2,13 +2,13 @@
  *
  */
 
-import { createStore, combineReducers, applyMiddleware } from 'redux';
+import {createStore, combineReducers, applyMiddleware} from 'redux';
 import thunkMiddleware from 'redux-thunk';
 
 import React from 'react';
 import ReactDOM from 'react-dom';
 
-import { Provider } from 'react-redux';
+import {Provider} from 'react-redux';
 
 import SdkMap from '@boundlessgeo/sdk/components/map';
 import SdkZoomControl from '@boundlessgeo/sdk/components/map/zoom-control';
@@ -23,7 +23,7 @@ import '@boundlessgeo/sdk/stylesheet/sdk.scss';
 const store = createStore(combineReducers({
   map: SdkMapReducer,
 }), window.__REDUX_DEVTOOLS_EXTENSION__ && window.__REDUX_DEVTOOLS_EXTENSION__(),
-   applyMiddleware(thunkMiddleware));
+applyMiddleware(thunkMiddleware));
 
 function main() {
   // Start with a reasonable global view of the map.
@@ -45,6 +45,7 @@ function main() {
   store.dispatch(mapActions.addLayer({
     id: 'osm',
     source: 'osm',
+    type: 'raster',
   }));
 
   // 'geojson' sources allow rendering a vector layer
@@ -53,16 +54,6 @@ function main() {
   store.dispatch(mapActions.addSource('points', {
     type: 'geojson',
     data: {},
-  }));
-
-  // Background layers change the background color of
-  // the map. They are not attached to a source.
-  store.dispatch(mapActions.addLayer({
-    id: 'background',
-    type: 'background',
-    paint: {
-      'background-color': '#eee',
-    },
   }));
 
   // The points source has both null island
@@ -77,6 +68,7 @@ function main() {
       'circle-radius': 5,
       'circle-color': '#756bb1',
       'circle-stroke-color': '#756bb1',
+      'circle-stroke-width': 1,
     },
   }));
 
@@ -112,7 +104,7 @@ function main() {
 
   // Demonstrate the paint colors changing.
   const changeColor = (color, type) => {
-    const paint_state = store.getState().map.layers[2].paint;
+    const paint_state = store.getState().map.layers[1].paint;
     const fill = paint_state['circle-color'];
     const stroke = paint_state['circle-stroke-color'];
     const radius = paint_state['circle-radius'];
@@ -120,6 +112,7 @@ function main() {
       'circle-radius': radius,
       'circle-color': type === 'fill' ? color : fill,
       'circle-stroke-color': type === 'stroke' ? color : stroke,
+      'circle-stroke-width': 1,
     };
     store.dispatch(mapActions.updateLayer('random-points', {
       paint,
@@ -150,7 +143,9 @@ function main() {
         key={i}
         className="colorChanger"
         style={control_style}
-        onClick={() => { changeColor(color, 'fill'); }}
+        onClick={() => {
+          changeColor(color, 'fill');
+        }}
       />
     ));
     stroke_color_controls.push((
@@ -160,20 +155,23 @@ function main() {
         key={i}
         className="colorChanger"
         style={control_style}
-        onClick={() => { changeColor(color, 'stroke'); }}
+        onClick={() => {
+          changeColor(color, 'stroke');
+        }}
       />
     ));
   }
 
   // Demonstrate the paint radius size changing.
   const changeSize = (size) => {
-    const paint_state = store.getState().map.layers[2].paint;
+    const paint_state = store.getState().map.layers[1].paint;
     const fill = paint_state['circle-color'];
     const stroke = paint_state['circle-stroke-color'];
     const paint = {
       'circle-radius': size,
       'circle-color': fill,
       'circle-stroke-color': stroke,
+      'circle-stroke-width': 1,
     };
     store.dispatch(mapActions.updateLayer('random-points', {
       paint,
@@ -198,7 +196,9 @@ function main() {
         key={i}
         className="colorChanger"
         style={control_style}
-        onClick={() => { changeSize(size); }}
+        onClick={() => {
+          changeSize(size);
+        }}
       >{sizes[i]}</div>
     ));
   }

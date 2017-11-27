@@ -1,31 +1,76 @@
-/* global it, describe, expect, beforeEach */
+/* global it, describe, expect, beforeEach, spyOn */
 
 import React from 'react';
-import { mount, configure } from 'enzyme';
+import {mount, configure} from 'enzyme';
 import  Adapter from 'enzyme-adapter-react-16';
 
-import { createStore, combineReducers } from 'redux';
-import { Provider } from 'react-redux';
+import {createStore, combineReducers} from 'redux';
+import {Provider} from 'react-redux';
 
 import MapReducer from '../../src/reducers/map';
 import * as MapActions from '../../src/actions/map';
-import { isLayerVisible } from '../../src/util';
+import {isLayerVisible} from '../../src/util';
 
-import SdkLayerList, { SdkLayerListItem } from '../../src/components/layer-list';
+import SdkLayerList from '../../src/components/layer-list';
+import SdkLayerListItem from  '../../src/components/layer-list-item';
+import {layerListItemTarget} from '../../src/components/layer-list-item';
 
-configure({ adapter: new Adapter() });
+configure({adapter: new Adapter()});
 
 class TestLayerListItem extends SdkLayerListItem {
   render() {
     return (
       <div>
-        <button className="btn-up" onClick={() => { this.moveLayerUp(); }}></button>
-        <button className="btn-down" onClick={() => { this.moveLayerDown(); }}></button>
-        <button className="btn-remove" onClick={() => { this.removeLayer(); }}></button>
+        <button className="btn-up" onClick={() => {
+          this.moveLayerUp();
+        }}></button>
+        <button className="btn-down" onClick={() => {
+          this.moveLayerDown();
+        }}></button>
+        <button className="btn-remove" onClick={() => {
+          this.removeLayer();
+        }}></button>
       </div>
     );
   }
 }
+
+// uses ol instead of ul
+class TestList extends React.Component {
+  render() {
+    return (
+      <ol>
+        {this.props.children}
+      </ol>
+    );
+  }
+}
+
+class TestListGroup extends React.Component {
+  render() {
+    const children = [];
+    let text;
+    if (this.props.group.collapsed) {
+      text = this.props.group.name;
+    } else {
+      text = (<b>{this.props.group.name}</b>);
+    }
+    for (let i = 0, ii = this.props.childLayers.length; i < ii; i++) {
+      children.push(
+        <this.props.layerClass
+          exclusive={this.props.group.exclusive}
+          key={i}
+          groupLayers={this.props.childLayers}
+          layers={this.props.layers}
+          layer={this.props.childLayers[i]}
+          groupId={this.props.groupId}
+        />
+      );
+    }
+    return (<li>{text}<ol>{children}</ol></li>);
+  }
+}
+
 
 describe('test the LayerList component', () => {
   let store = null;
@@ -101,12 +146,12 @@ describe('test the LayerList component', () => {
   });
 
   it('should allow for custom className', () => {
-    const wrapper = mount(<Provider store={store}><SdkLayerList className='foo' /></Provider>);
+    const wrapper = mount(<Provider store={store}><SdkLayerList enableDD={false} className='foo' /></Provider>);
     expect(wrapper.html()).toMatchSnapshot();
   });
 
   function getCustomLayerList() {
-    return mount(<Provider store={store}><SdkLayerList layerClass={TestLayerListItem} /></Provider>);
+    return mount(<Provider store={store}><SdkLayerList enableDD={false} layerClass={TestLayerListItem} /></Provider>);
   }
 
   it('should render with a custom layer list class', () => {
@@ -167,10 +212,10 @@ describe('test the LayerList component', () => {
     expect(isLayerVisible(store.getState().map.layers[0])).toBe(true);
 
     const checkbox = wrapper.find('input').last();
-    checkbox.simulate('change', { target: { checked: false }});
+    checkbox.simulate('change', {target: {checked: false}});
 
     expect(isLayerVisible(store.getState().map.layers[0])).toBe(false);
-    checkbox.simulate('change', { target: { checked: true }});
+    checkbox.simulate('change', {target: {checked: true}});
     expect(isLayerVisible(store.getState().map.layers[0])).toBe(true);
   });
 
@@ -195,13 +240,142 @@ describe('test the LayerList component', () => {
         'mapbox:group': 'overlays'
       }
     }));
-    store.dispatch(MapActions.updateLayer('image-test', {
+    store.dispatch(MapActions.updateLayer('html-test', {
       metadata: {
         'mapbox:group': 'overlays'
       }
     }));
-    const wrapper = mount(<Provider store={store}><SdkLayerList /></Provider>);
+    const wrapper = mount(<Provider store={store}><SdkLayerList enableDD={false} /></Provider>);
     expect(wrapper.html()).toMatchSnapshot();
+  });
+
+  it('should handle hiding layers', () => {
+    store.dispatch(MapActions.updateLayer('osm', {
+      metadata: {
+        'bnd:hide-layerlist': true
+      }
+    }));
+    const wrapper = mount(<Provider store={store}><SdkLayerList enableDD={false} /></Provider>);
+    expect(wrapper.html()).toMatchSnapshot();
+  });
+
+  it('should handle a custom list class', () => {
+    const wrapper = mount(<Provider store={store}><SdkLayerList enableDD={false} listClass={TestList} /></Provider>);
+    expect(wrapper.html()).toMatchSnapshot();
+  });
+
+  it('should handle a custom list and listgroup class', () => {
+    store.dispatch(MapActions.updateMetadata({
+      'mapbox:groups': {
+        'background': {
+          name: 'Base Maps',
+          collapsed: true
+        },
+        'overlays': {
+          name: 'Overlays',
+          collapsed: false
+        },
+      }
+    }));
+    store.dispatch(MapActions.updateLayer('osm', {
+      metadata: {
+        'mapbox:group': 'background'
+      }
+    }));
+    store.dispatch(MapActions.updateLayer('wms-test', {
+      metadata: {
+        'mapbox:group': 'overlays'
+      }
+    }));
+    store.dispatch(MapActions.updateLayer('html-test', {
+      metadata: {
+        'mapbox:group': 'overlays'
+      }
+    }));
+    const wrapper = mount(<Provider store={store}><SdkLayerList enableDD={false} groupClass={TestListGroup} listClass={TestList} /></Provider>);
+    expect(wrapper.html()).toMatchSnapshot();
+  });
+
+  it('should handle hiding layers in a group', () => {
+    store.dispatch(MapActions.updateMetadata({
+      'mapbox:groups': {
+        'background': {
+          name: 'Base Maps',
+        },
+        'overlays': {
+          name: 'Overlays',
+        },
+      }
+    }));
+    store.dispatch(MapActions.updateLayer('osm', {
+      metadata: {
+        'mapbox:group': 'background'
+      }
+    }));
+    store.dispatch(MapActions.updateLayer('wms-test', {
+      metadata: {
+        'mapbox:group': 'overlays',
+        'bnd:hide-layerlist': true
+      }
+    }));
+    store.dispatch(MapActions.updateLayer('html-test', {
+      metadata: {
+        'mapbox:group': 'overlays'
+      }
+    }));
+    const wrapper = mount(<Provider store={store}><SdkLayerList enableDD={false} /></Provider>);
+    expect(wrapper.html()).toMatchSnapshot();
+  });
+});
+
+describe('test drag and drop', () => {
+  let drop, layers, props, monitor, item;
+  beforeEach(() => {
+    drop = layerListItemTarget.drop;
+    layers = [{
+      id: 'foo',
+      index: 0,
+    }, {
+      id: 'bar',
+      index: 1,
+    }, {
+      id: 'baz',
+      index: 2,
+    }];
+    const dispatch = function() {};
+    props = {index: 2, layers, dispatch};
+    item = {
+      index: 1,
+      layer: layers[1],
+    };
+    monitor = {
+      getItem() {
+        return item;
+      }
+    };
+  });
+  it('should dispatch on drop', () => {
+    spyOn(props, 'dispatch');
+    drop(props, monitor);
+    expect(props.dispatch).toHaveBeenCalledWith({'layerId': 'bar', 'targetId': 'baz', 'type': 'MAP_ORDER_LAYER'});
+  });
+  it('should not dispatch if source and target are the same', () => {
+    props.index = 1;
+    spyOn(props, 'dispatch');
+    drop(props, monitor);
+    expect(props.dispatch).not.toHaveBeenCalled();
+  });
+  it('should not dispatch if no source item layer', () => {
+    delete item.layer;
+    spyOn(props, 'dispatch');
+    drop(props, monitor);
+    expect(props.dispatch).not.toHaveBeenCalled();
+  });
+  it('should not dispatch if hover index out of bounds', () => {
+    props.index = 10;
+    spyOn(props, 'dispatch');
+    drop(props, monitor);
+    expect(props.dispatch).not.toHaveBeenCalled();
   });
 });
 
@@ -255,7 +429,7 @@ describe('test the exclusive grouping of the LayerList component', () => {
   });
 
   it('should handle exclusive groups', () => {
-    const wrapper = mount(<Provider store={store}><SdkLayerList /></Provider>);
+    const wrapper = mount(<Provider store={store}><SdkLayerList enableDD={false} /></Provider>);
     expect(wrapper.html()).toMatchSnapshot();
   });
 
@@ -265,7 +439,7 @@ describe('test the exclusive grouping of the LayerList component', () => {
     expect(isLayerVisible(store.getState().map.layers[0])).toBe(true);
 
     const checkbox = wrapper.find('input').first();
-    checkbox.simulate('change', { target: { checked: true }});
+    checkbox.simulate('change', {target: {checked: true}});
 
     expect(isLayerVisible(store.getState().map.layers[0])).toBe(false);
     expect(isLayerVisible(store.getState().map.layers[1])).toBe(false);
