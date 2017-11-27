@@ -1,4 +1,4 @@
-FROM node:7.1.0-slim
+FROM node:9.2.0
 
 # Create app directory
 WORKDIR /var/lib/sdk
